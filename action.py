@@ -61,7 +61,10 @@ from calibre.gui2 import (
     open_url,
 )
 from calibre.devices.usbms.driver import debug_print as root_debug_print
-from calibre.constants import numeric_version
+from calibre.constants import numeric_version, preferred_encoding
+from calibre.db.cache import Cache
+from calibre.utils.icu import lower as icu_lower
+from calibre import isbytestring
 from enum import Enum, auto
 
 __license__ = 'GNU GPLv3'
@@ -103,6 +106,8 @@ class OperationStatus(Enum):
     FAIL = auto()
     SKIP = auto()
 
+def title_lookup(db: Cache):
+    return {icu_lower(value): id for id, value in db.fields['title'].table.book_col_map.items()}
 
 def is_system_path(path):
     """
@@ -401,16 +406,20 @@ class KoreaderAction(InterfaceAction):
         for book in device.books():
             debug_print(f'uuid to path: {book.uuid} - {book.path}')
 
-        paths = {
-            book.uuid: re.sub(
-                r'\.(\w+)$', r'.sdr/metadata.\1.lua', book.path
-            )
+        paths = [
+            (book.uuid, book, re.sub(r"\.(\w+)$", r".sdr/metadata.\1.lua", book.path))
             for book in device.books()
-        }
+        ]
+        # paths = {
+        #     book.uuid: re.sub(
+        #         r'\.(\w+)$', r'.sdr/metadata.\1.lua', book.path
+        #     )
+        #     for book in device.books()
+        # }
 
         debug_print(
             f'generated {len(paths)} path(s) to sidecar Lua files:\n\t',
-            '\n\t'.join(paths.values())
+            '\n\t'.join([path for (_,_,path) in paths])
         )
 
         return paths
@@ -763,7 +772,7 @@ class KoreaderAction(InterfaceAction):
         debug_print('sidecar_paths: ', sidecar_paths)
         sidecar_paths_exist = {}
         sidecar_paths_not_exist = {}
-        for book_uuid, path in sidecar_paths.items():
+        for book_uuid, book, path in sidecar_paths:
             if os.path.exists(path):
                 sidecar_paths_exist[book_uuid] = path
             else:
@@ -1101,12 +1110,19 @@ class KoreaderAction(InterfaceAction):
                 num_fail = 0
                 num_skip = 0
 
-                for idx, (book_uuid, sidecar_path) in enumerate(sidecar_paths.items()):
+                titles = title_lookup(db)
+
+                for idx, (book_uuid, book, sidecar_path) in enumerate(sidecar_paths):
                     debug_print('Trying to get sidecar from ', device,
                                 ', with sidecar_path: ', sidecar_path)
+                    search = book.title
+                    if isbytestring(search):
+                        search = search.decode(preferred_encoding, 'replace')
+                    search = icu_lower(search)
+                    book_by_title=titles.get(search)
 
                     # pre-checks before parsing
-                    if book_uuid is None:
+                    if book_uuid is None and book_by_title is None:
                         status = 'skipped, no UUID'
                         append_results(results, None, status,
                                        book_uuid, sidecar_path)
@@ -1116,8 +1132,21 @@ class KoreaderAction(InterfaceAction):
                     sidecar_contents = self.action.get_sidecar(
                         device, sidecar_path)
                     debug_print("sidecar_contents:", sidecar_contents)
-                    book_id = db.lookup_by_uuid(book_uuid)
+                    book_id = book_by_title
+                    if book_uuid is not None:
+                        book_id_by_uuid = db.lookup_by_uuid(book_uuid)
+                        if book_id_by_uuid != book_id:
+                            status = f"book id {book_by_title} does not match uuid id {book_id_by_uuid}"
+                            append_results(results, search, status,
+                                        book_uuid, sidecar_path)
+                            num_skip += 1
+                            continue
+                    
                     metadata = db.get_metadata(book_id)
+                    book_matched_by_title = False
+                    if book_uuid is None:
+                        book_uuid = metadata.get('uuid')
+                        book_matched_by_title = True
                     title = metadata.get('title')
                     self.progress_update.emit(idx + 1, title)
                     if DEBUG: # Add time delay when debugging
@@ -1126,6 +1155,8 @@ class KoreaderAction(InterfaceAction):
                     if sidecar_contents is GetSidecarStatus.PATH_NOT_FOUND:
                         status = ('skipped, sidecar does not exist '
                                   '(seems like book is never opened)')
+                        if book_matched_by_title:
+                            status += ' [matched by title]'
                         append_results(results, title, status,
                                        book_uuid, sidecar_path)
                         num_skip += 1
@@ -1133,6 +1164,8 @@ class KoreaderAction(InterfaceAction):
 
                     elif sidecar_contents is GetSidecarStatus.DECODE_FAILED:
                         status = 'decoding is failed see debug for more details'
+                        if book_matched_by_title:
+                            status += ' [matched by title]'
                         append_results(results, title, status,
                                        book_uuid, sidecar_path)
                         num_fail += 1
@@ -1183,6 +1216,9 @@ class KoreaderAction(InterfaceAction):
                     operation_status, result = self.action.update_metadata(
                         book_uuid, db, keys_values_to_update
                     )
+                    if book_matched_by_title:
+                        result['status'] = result['status'] + ' [matched by title]'
+                        
 
                     results.append(
                         {
@@ -1203,7 +1239,7 @@ class KoreaderAction(InterfaceAction):
                 self.finished_signal.emit(
                     {'results': results, 'num_success': num_success, 'num_fail': num_fail, 'num_skip': num_skip})
 
-        db = self.gui.current_db.new_api
+        db: Cache = self.gui.current_db.new_api
         startTime = time.perf_counter()
         self.koSyncWorker = KOSyncWorker(self, db, sidecar_paths)
         progress_dialog = None
