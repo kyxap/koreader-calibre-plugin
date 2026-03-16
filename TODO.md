@@ -2,7 +2,7 @@
 
 ## 🚀 High Priority (0.8.x Release)
 - [x] Fix `apsw.TooBigError` for books with 900+ highlights [#114](https://github.com/kyxap/koreader-calibre-plugin/issues/114)
-- [ ] Implement robust UUID matching: Parse `calibre:` prefix in sidecar identifiers to fix mismatches [#115](https://github.com/kyxap/koreader-calibre-plugin/issues/115), [#99](https://github.com/kyxap/koreader-calibre-plugin/issues/99)
+- [x] Implement robust UUID matching: Parse `calibre:` prefix in sidecar identifiers to fix mismatches [#115](https://github.com/kyxap/koreader-calibre-plugin/issues/115), [#99](https://github.com/kyxap/koreader-calibre-plugin/issues/99)
 - [ ] Add support for `POCKETBOOK_IMPROVED` driver [#63](https://github.com/kyxap/koreader-calibre-plugin/issues/63)
 
 ## 🐛 Bug Fixes
