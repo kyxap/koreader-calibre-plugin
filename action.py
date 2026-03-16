@@ -482,6 +482,24 @@ class KoreaderAction(InterfaceAction):
 
         return parsed_contents
 
+    def get_calibre_uuid_from_sidecar(self, sidecar_contents):
+        """Extracts the calibre UUID from sidecar identifiers if present.
+        (Issue #115)
+        """
+        if not isinstance(sidecar_contents, dict):
+            return None
+        stats = sidecar_contents.get('stats', {})
+        identifiers_str = stats.get('identifiers', '')
+        if not identifiers_str:
+            return None
+
+        # KOReader uses both space and \ as separators in some versions
+        parts = re.split(r'[\s\\]+', identifiers_str)
+        for part in parts:
+            if part.startswith('calibre:'):
+                return part.replace('calibre:', '').strip()
+        return None
+
     def update_metadata(self, uuid, db, keys_values_to_update):
         """Update multiple metadata columns for the given book.
 
@@ -1202,6 +1220,15 @@ class KoreaderAction(InterfaceAction):
 
                     try:
                         book_id = db.lookup_by_uuid(book_uuid)
+                        if not book_id:
+                            # Try to find a better UUID in the sidecar (Issue #115)
+                            better_uuid = self.action.get_calibre_uuid_from_sidecar(sidecar_contents)
+                            if better_uuid:
+                                debug_print(f"Found alternative UUID in sidecar: {better_uuid}")
+                                book_id = db.lookup_by_uuid(better_uuid)
+                                if book_id:
+                                    book_uuid = better_uuid # Use the one that worked
+
                         if not book_id:
                             raise Exception("Book not found")
                         metadata = db.get_metadata(book_id)
