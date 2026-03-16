@@ -31,6 +31,7 @@ The plugin maps KOReader's Lua sidecar data to Calibre custom columns. Key field
 ### Metadata Extraction
 - **Sidecar Parsing:** Sidecar files (`.lua`) are parsed into Python dicts using the internal `slpp.py` (Lua-in-Python parser).
 - **Robustness:** Always use `.get()` or check for the existence of the `summary` key. Older or corrupted KOReader files may lack this key, which previously caused crashes.
+- **Large Annotations:** To avoid `apsw.TooBigError` (Issue #114), the metadata extraction loop for hidden attributes must be O(N) relative to the number of highlights. Never iterate over the entire bookmark collection inside an individual annotation loop.
 - **Renamed Fields:** Be aware that `bookmarks` was renamed to `annotations` in newer sidecar formats.
 
 ### Book Identification
@@ -41,7 +42,6 @@ The plugin maps KOReader's Lua sidecar data to Calibre custom columns. Key field
 
 - **Hidden Folders:** The plugin is configured to ignore any book paths containing hidden directories (e.g., `.stfolder`, `.stversions`) to avoid "None Book" entries in the UI.
 - **Python Versioning:** The plugin aims for compatibility with Python 3.12+. All regex patterns MUST use raw strings (`r"..."`) to avoid `SyntaxWarning` for invalid escape sequences.
-- **Calibre Database Limits:** Very large annotations (900+ highlights) can trigger `apsw.TooBigError` when saving to Calibre's SQLite database. (Ref: Issue #114).
 
 ## 🧪 Development & Debugging
 - Use `make dev` to build and install the development version.
