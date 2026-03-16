@@ -45,28 +45,56 @@ def test_wireless_device_avoids_local_filesystem():
         # After the fix, it should NOT be called for non-USB devices.
         mock_exists.assert_not_called()
 
-def test_usb_device_uses_local_filesystem():
+def test_usb_device_triggers_makedirs():
     """
-    Verifies that USB devices STILL use the local filesystem for speed.
+    Verifies that for USB devices, the plugin attempts to create the 
+    sidecar directory if it doesn't exist.
     """
     from calibre.devices.usbms.driver import USBMS
-    
     class MyUSBDevice(USBMS):
-        def exists(self, path):
-            return False
+        def put_file(self, path, stream): pass
 
     mock_device = MyUSBDevice()
-    
     mock_parent = MagicMock()
     mock_site_customization = MagicMock()
     action = KoreaderAction(mock_parent, mock_site_customization)
     
-    device_path = "D:/Books/Test.sdr/metadata.epub.lua"
+    device_path = "E:/Books/NewBook.sdr/metadata.epub.lua"
+    
+    # Mock DB lookup to return metadata
+    action.gui.current_db.new_api.lookup_by_uuid.return_value = 1
+    mock_metadata = MagicMock()
+    mock_metadata.get.return_value = '{"test": 1}' # dummy sidecar json
+    action.gui.current_db.new_api.get_metadata.return_value = mock_metadata
 
-    with patch('os.path.exists') as mock_exists:
-        mock_exists.return_value = True
+    with patch('os.makedirs') as mock_makedirs, \
+         patch('os.path.exists') as mock_exists:
+        mock_exists.return_value = False
         
-        exists = action.device_path_exists(mock_device, device_path)
+        action.push_metadata_to_koreader_sidecar(mock_device, "some-uuid", device_path)
         
-        assert exists is True
-        mock_exists.assert_called_with(device_path)
+        # This will currently FAIL because I removed makedirs
+        mock_makedirs.assert_called_with(os.path.dirname(device_path), exist_ok=True)
+
+def test_wireless_device_skips_makedirs():
+    """
+    Verifies that for wireless devices, the plugin does NOT call os.makedirs.
+    """
+    class WirelessDevice:
+        def put_file(self, path, stream): pass
+
+    mock_device = WirelessDevice()
+    mock_parent = MagicMock()
+    mock_site_customization = MagicMock()
+    action = KoreaderAction(mock_parent, mock_site_customization)
+    
+    device_path = "/mnt/onboard/Books/NewBook.sdr/metadata.epub.lua"
+    
+    action.gui.current_db.new_api.lookup_by_uuid.return_value = 1
+    mock_metadata = MagicMock()
+    mock_metadata.get.return_value = '{"test": 1}'
+    action.gui.current_db.new_api.get_metadata.return_value = mock_metadata
+
+    with patch('os.makedirs') as mock_makedirs:
+        action.push_metadata_to_koreader_sidecar(mock_device, "some-uuid", device_path)
+        mock_makedirs.assert_not_called()

@@ -795,6 +795,19 @@ class KoreaderAction(InterfaceAction):
         sidecar_lua = re.sub(r'\["(\d+)"\]', r'[\1]', sidecar_lua)
         sidecar_lua_formatted = f"-- we can read Lua syntax here!\nreturn {sidecar_lua}\n"
 
+        # Create parent directory for USB devices (Issue #68 / #73)
+        if self.is_usb_device(device):
+            try:
+                parent_dir = os.path.dirname(path)
+                if not os.path.exists(parent_dir):
+                    debug_print(f"Creating directory: {parent_dir}")
+                    os.makedirs(parent_dir, exist_ok=True)
+            except OSError as os_e:
+                debug_print(f"Failed to create directory {parent_dir}: {os_e}")
+                return "failure", {
+                    'result': f'Unable to create directory at: {path} due to {os_e}',
+                }
+
         # Use device.put_file to support wireless devices (#122)
         # Check if driver supports writing arbitrary files
         if not hasattr(device, 'put_file'):
