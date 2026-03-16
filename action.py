@@ -59,7 +59,7 @@ from calibre.gui2 import (
     warning_dialog,
     open_url,
 )
-from calibre.devices.usbms.driver import debug_print as root_debug_print
+from calibre.devices.usbms.driver import debug_print as root_debug_print, USBMS
 from calibre.constants import numeric_version
 from enum import Enum, auto
 
@@ -197,6 +197,10 @@ class KoreaderAction(InterfaceAction):
         else:
             self.version = f'{base.name} (v{".".join(map(str, base.version))})'
         self.extension_callback = None
+
+    def is_usb_device(self, device):
+        """Returns True if the device is connected via USB Mass Storage."""
+        return isinstance(device, USBMS)
 
         # Overwrite icon with actual KOReader logo
         icon = get_icons(
@@ -466,12 +470,13 @@ class KoreaderAction(InterfaceAction):
                 parsed_contents['summary'] = {'status': 'unknown', 'modified': datetime.now().strftime("%Y-%m-%d")}
 
             # Define metadata extraction tasks
+            is_usb = self.is_usb_device(device)
             metadata_tasks = [
                 ('date_synced', lambda: datetime.now().replace(tzinfo=local_tz)),
                 ('date_status_changed', lambda: datetime.strptime(
                     parsed_contents['summary'].get('modified', datetime.now().strftime("%Y-%m-%d")), "%Y-%m-%d").replace(tzinfo=local_tz)),
                 ('date_sidecar_modified', lambda: datetime.fromtimestamp(
-                    os.path.getmtime(path) if os.path.exists(path) else time.time()).replace(tzinfo=local_tz))
+                    os.path.getmtime(path) if is_usb and os.path.exists(path) else time.time()).replace(tzinfo=local_tz))
             ]
 
             for key, task in metadata_tasks:
@@ -719,7 +724,7 @@ class KoreaderAction(InterfaceAction):
                 pass
 
         # 2. Try local filesystem (for USB)
-        if not exists:
+        if not exists and self.is_usb_device(device):
             try:
                 if os.path.exists(path):
                     exists = True
