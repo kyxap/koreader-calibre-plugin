@@ -5,7 +5,7 @@ import types
 import importlib.util
 from unittest.mock import MagicMock
 
-# 1. Mock gettext '_' function which Calibre injects into builtins
+# 1. Mock gettext '_' function
 if not hasattr(builtins, '_'):
     builtins._ = lambda x: x
 
@@ -17,50 +17,52 @@ calibre = types.ModuleType("calibre")
 calibre.constants = MagicMock()
 calibre.constants.numeric_version = (6, 0, 0)
 calibre.customize = MagicMock()
+
+# IMPORTANT: Base classes must be classes, not Mocks
 class MockInterfaceActionBase:
     pass
 calibre.customize.InterfaceActionBase = MockInterfaceActionBase
 
 calibre.devices = MagicMock()
 calibre.devices.usbms = MagicMock()
-calibre.devices.usbms.driver = MagicMock()
 
-# Setup calibre.utils as a package
+# IMPORTANT: USBMS must be a class for isinstance() to work in action.py
+class MockUSBMS:
+    pass
+calibre.devices.usbms.driver = MagicMock()
+calibre.devices.usbms.driver.USBMS = MockUSBMS
+
+# Setup calibre.utils
 calibre_utils = types.ModuleType("calibre.utils")
 calibre_utils.__path__ = []
 calibre.utils = calibre_utils
-
 calibre_utils.config = MagicMock()
 calibre_utils.iso8601 = MagicMock()
-# Mock timezone objects
 from datetime import timezone
 calibre_utils.iso8601.utc_tz = timezone.utc
-calibre_utils.iso8601.local_tz = timezone.utc # Good enough for mocks
+calibre_utils.iso8601.local_tz = timezone.utc
 
 # Setup calibre.gui2
 calibre_gui2 = types.ModuleType("calibre.gui2")
 calibre_gui2.__path__ = []
 calibre.gui2 = calibre_gui2
-
 calibre_gui2.actions = MagicMock()
 class MockInterfaceAction:
     def __init__(self, parent, site_customization):
         self.gui = parent
         self.interface_action_base_plugin = site_customization
 calibre_gui2.actions.InterfaceAction = MockInterfaceAction
-
 calibre_gui2.device = MagicMock()
 calibre_gui2.show_restart_warning = MagicMock()
 calibre_gui2.error_dialog = MagicMock()
 calibre_gui2.warning_dialog = MagicMock()
 calibre_gui2.open_url = MagicMock()
 
-# Setup calibre.gui2.dialogs as a package
+# Setup calibre.gui2.dialogs
 calibre_gui2_dialogs = types.ModuleType("calibre.gui2.dialogs")
 calibre_gui2_dialogs.__path__ = []
 calibre_gui2.dialogs = calibre_gui2_dialogs
 sys.modules["calibre.gui2.dialogs"] = calibre_gui2_dialogs
-
 calibre_gui2_dialogs.message_box = MagicMock()
 calibre_gui2_dialogs.message_box.MessageBox = MagicMock()
 
@@ -91,7 +93,6 @@ calibre_plugins.koreader = koreader_pkg
 sys.modules["calibre_plugins.koreader"] = koreader_pkg
 
 # 5. Import local modules
-# Load __init__.py manually
 init_path = os.path.join(os.path.dirname(__file__), '..', '__init__.py')
 spec = importlib.util.spec_from_file_location("__init__", init_path)
 __init__ = importlib.util.module_from_spec(spec)
@@ -100,18 +101,16 @@ spec.loader.exec_module(__init__)
 
 import slpp
 
-# 6. Assign submodules to the package
+# 6. Assign submodules to package
 koreader_pkg.slpp = slpp
 sys.modules["calibre_plugins.koreader.slpp"] = slpp
-
-# __init__ exports
 koreader_pkg.clean_bookmarks = __init__.clean_bookmarks
 koreader_pkg.DEBUG = __init__.DEBUG
 koreader_pkg.DRY_RUN = __init__.DRY_RUN
 koreader_pkg.PYDEVD = __init__.PYDEVD
 koreader_pkg.KoreaderSync = __init__.KoreaderSync
 
-# 7. Import config (depends on setup)
+# 7. Import config
 import config
 koreader_pkg.config = config
 sys.modules["calibre_plugins.koreader.config"] = config

@@ -59,7 +59,7 @@ from calibre.gui2 import (
     warning_dialog,
     open_url,
 )
-from calibre.devices.usbms.driver import debug_print as root_debug_print
+from calibre.devices.usbms.driver import debug_print as root_debug_print, USBMS
 from calibre.constants import numeric_version
 from enum import Enum, auto
 
@@ -150,7 +150,7 @@ def parse_sidecar_lua(sidecar_lua):
         decoded_lua = None
 
     if 'bookmarks' in decoded_lua:
-        if type(decoded_lua['bookmarks']) is list:
+        if isinstance(decoded_lua['bookmarks'], list):
             decoded_lua['bookmarks'] = {
                 # Starts from 1
                 i+1: bookmark for i, bookmark in enumerate(decoded_lua['bookmarks'])}
@@ -226,8 +226,8 @@ class KoreaderAction(InterfaceAction):
             'Sync from ProgressSync',
             'Sync from ProgressSync',
             icon='convert.png',
-            description='Use KOReader''s built in ProgressSync Plugin '
-                        'to update percentRead int or float.',
+            description="Use KOReader's built in ProgressSync Plugin "
+                        "to update percentRead int or float.",
             triggered=self.sync_progress_from_progresssync
         )
 
@@ -286,6 +286,10 @@ class KoreaderAction(InterfaceAction):
                         return
                 except Exception as e:
                     print(f"Failed to load extension: {e}")
+
+    def is_usb_device(self, device):
+        """Returns True if the device is connected via USB Mass Storage."""
+        return isinstance(device, USBMS)
 
     def exec_main_action(self) -> None:
         # Execute main action defined by user
@@ -386,7 +390,7 @@ class KoreaderAction(InterfaceAction):
         return connected_device
 
     def _on_device_metadata_available(self):
-        self.sync_to_calibre(silent=True if not DEBUG else False)
+        self.sync_to_calibre(silent=not DEBUG)
 
     def get_paths(self, device):
         """Retrieves paths to sidecars of all books in calibre's library
@@ -459,19 +463,20 @@ class KoreaderAction(InterfaceAction):
             debug_print(f'Parsing: {path}')
             parsed_contents = parse_sidecar_lua(decoded_contents)
             parsed_contents['calculated'] = {}
-            
+
             # Ensure 'summary' exists to avoid KeyError later (#117)
             if 'summary' not in parsed_contents:
                 debug_print(f"Warning: 'summary' key missing in sidecar for {path}")
                 parsed_contents['summary'] = {'status': 'unknown', 'modified': datetime.now().strftime("%Y-%m-%d")}
 
             # Define metadata extraction tasks
+            is_usb = self.is_usb_device(device)
             metadata_tasks = [
                 ('date_synced', lambda: datetime.now().replace(tzinfo=local_tz)),
                 ('date_status_changed', lambda: datetime.strptime(
                     parsed_contents['summary'].get('modified', datetime.now().strftime("%Y-%m-%d")), "%Y-%m-%d").replace(tzinfo=local_tz)),
                 ('date_sidecar_modified', lambda: datetime.fromtimestamp(
-                    os.path.getmtime(path) if os.path.exists(path) else time.time()).replace(tzinfo=local_tz))
+                    os.path.getmtime(path) if is_usb and os.path.exists(path) else time.time()).replace(tzinfo=local_tz))
             ]
 
             for key, task in metadata_tasks:
@@ -680,25 +685,26 @@ class KoreaderAction(InterfaceAction):
                 show_copy_button=False
             )
             return False
-        elif device_class in SUPPORTED_DEVICES:
+
+        if device_class in SUPPORTED_DEVICES:
             return True
-        else:
-            debug_print(
-                'not yet supported device, device_class = ',
-                device_class
-            )
-            warning_dialog(
-                self.gui,
-                'Device not yet supported',
-                f'Devices of the type {device_class} are not yet supported by this plugin. '
-                f'Please check if there already is a feature request for this '
-                f'<a href="https://github.com/harmtemolder/koreader-calibre-plugin/issues">'
-                f'here</a>. If not, feel free to create one. I\'ll try to sync anyway.',
-                det_msg='',
-                show=True,
-                show_copy_button=False
-            )
-            return True
+
+        debug_print(
+            'not yet supported device, device_class = ',
+            device_class
+        )
+        warning_dialog(
+            self.gui,
+            'Device not yet supported',
+            f'Devices of the type {device_class} are not yet supported by this plugin. '
+            f'Please check if there already is a feature request for this '
+            f'<a href="https://github.com/harmtemolder/koreader-calibre-plugin/issues">'
+            f'here</a>. If not, feel free to create one. I\'ll try to sync anyway.',
+            det_msg='',
+            show=True,
+            show_copy_button=False
+        )
+        return True
 
     def device_path_exists(self, device, path):
         """Checks if a path exists on the device, with timing debug logs."""
@@ -719,7 +725,7 @@ class KoreaderAction(InterfaceAction):
                 pass
 
         # 2. Try local filesystem (for USB)
-        if not exists:
+        if not exists and self.is_usb_device(device):
             try:
                 if os.path.exists(path):
                     exists = True
@@ -788,7 +794,7 @@ class KoreaderAction(InterfaceAction):
         # KOReader uses those.
         sidecar_lua = re.sub(r'\["(\d+)"\]', r'[\1]', sidecar_lua)
         sidecar_lua_formatted = f"-- we can read Lua syntax here!\nreturn {sidecar_lua}\n"
-        
+
         # Use device.put_file to support wireless devices (#122)
         # Check if driver supports writing arbitrary files
         if not hasattr(device, 'put_file'):
@@ -842,14 +848,14 @@ class KoreaderAction(InterfaceAction):
 
         sidecar_paths = self.get_paths(device)
         debug_print('sidecar_paths: ', sidecar_paths)
-        
+
         results = []
         num_processed = 0
         num_success = 0
         num_no_metadata = 0
         num_fail = 0
         num_skipped_existing = 0
-        
+
         for book_uuid, path in sidecar_paths:
             # Check if exists first (issue #122 revisited)
             if self.device_path_exists(device, path):
@@ -1235,7 +1241,7 @@ class KoreaderAction(InterfaceAction):
                         title = metadata.get('title')
                     except Exception as e:
                         debug_print(f"Failed to lookup book {book_uuid}: {e}")
-                        status = f'skipped, could not find in library'
+                        status = 'skipped, could not find in library'
                         append_results(results, "Unknown", status,
                                        book_uuid, sidecar_path)
                         num_skip += 1
@@ -1253,15 +1259,14 @@ class KoreaderAction(InterfaceAction):
                         num_skip += 1
                         continue
 
-                    elif sidecar_contents is GetSidecarStatus.DECODE_FAILED:
+                    if sidecar_contents is GetSidecarStatus.DECODE_FAILED:
                         status = 'decoding is failed see debug for more details'
                         append_results(results, title, status,
                                        book_uuid, sidecar_path)
                         num_fail += 1
                         continue
 
-                    else:
-                        debug_print('sidecar_contents is found!')
+                    debug_print('sidecar_contents is found!')
 
                     keys_values_to_update = {}
 
