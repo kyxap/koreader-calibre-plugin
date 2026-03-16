@@ -79,8 +79,8 @@ def clean_bookmarks(bookmarks):
         hidden_attributes = ''
         if len(bookmarks) > 0:
             hidden_attributes += ' <!-- '
-            for attr in bookmarks:
-                hidden_attributes += f'{attr}: {bookmarks[attr]}, '
+            for attr, val in annotation.items():
+                hidden_attributes += f'{attr}: {val}, '
             hidden_attributes = hidden_attributes[:-2] + ' -->'
         hidden_attributes += '\n'
 
