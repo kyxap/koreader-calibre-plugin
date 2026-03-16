@@ -8,7 +8,7 @@
 ## 🐛 Bug Fixes
 - [x] Fix MD5 computation for Kobo devices using custom folders [#98](https://github.com/kyxap/koreader-calibre-plugin/issues/98)
 - [x] Fix sidecar directory resolution in Docker (linuxserver/calibre) environments [#73](https://github.com/kyxap/koreader-calibre-plugin/issues/73)
-- [ ] Resolve Windows "Access Denied" error for Kobo sidecar folder creation [#68](https://github.com/kyxap/koreader-calibre-plugin/issues/68)
+- [x] Resolve Windows "Access Denied" error for Kobo sidecar folder creation [#68](https://github.com/kyxap/koreader-calibre-plugin/issues/68)
 
 ## ✨ Enhancements & Features
 - [ ] Add support for highlights and bookmarks into the native `annotations` table in calibre's `metadata.db` [#95](https://github.com/kyxap/koreader-calibre-plugin/issues/95)
