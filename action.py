@@ -420,7 +420,7 @@ class KoreaderAction(InterfaceAction):
                 continue
 
             sidecar_path = re.sub(
-                r'\.(\w+)$', r'.sdr/metadata.\1.lua', book.path
+                r'\.([^./\\]+)$', r'.sdr/metadata.\1.lua', book.path
             )
             paths.append((book.uuid, sidecar_path))
 
@@ -1298,6 +1298,12 @@ class KoreaderAction(InterfaceAction):
                                     f'subproperty "{subproperty}" not found in value')
                                 value = None
                                 break
+
+                        # Fallback for MD5 (Issue #98)
+                        if config_name == 'column_md5' and value is None:
+                            value = sidecar_contents.get('stats', {}).get('md5')
+                            if value:
+                                debug_print('Found MD5 in fallback location (stats.md5)')
 
                         if value is None:
                             continue
