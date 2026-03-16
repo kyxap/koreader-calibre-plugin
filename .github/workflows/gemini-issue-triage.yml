@@ -19,14 +19,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Run Gemini Triage
         uses: google-github-actions/run-gemini-cli@v0
+        # Move env here (at the same level as 'with')
+        env:
+          GEMINI_FORCE_MODEL: "true"
+          GEMINI_DEBUG: "true"
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           model: "gemini-1.5-flash"
-          gemini_debug: true
           prompt: |
             Triage this KOReader Calibre Plugin issue.
             Event: ${{ github.event_name }}
