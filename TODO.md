@@ -7,7 +7,7 @@
 
 ## 🐛 Bug Fixes
 - [ ] Fix MD5 computation for Kobo devices using custom folders [#98](https://github.com/kyxap/koreader-calibre-plugin/issues/98)
-- [ ] Fix sidecar directory resolution in Docker (linuxserver/calibre) environments [#73](https://github.com/kyxap/koreader-calibre-plugin/issues/73)
+- [x] Fix sidecar directory resolution in Docker (linuxserver/calibre) environments [#73](https://github.com/kyxap/koreader-calibre-plugin/issues/73)
 - [ ] Resolve Windows "Access Denied" error for Kobo sidecar folder creation [#68](https://github.com/kyxap/koreader-calibre-plugin/issues/68)
 
 ## ✨ Enhancements & Features
