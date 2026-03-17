@@ -16,6 +16,10 @@ jobs:
     if: |
       github.event_name == 'issues' ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.comment.user.id == github.event.issue.user.id)
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
