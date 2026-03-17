@@ -21,16 +21,16 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Gemini Triage
         uses: google-github-actions/run-gemini-cli@v0
+        # This is the critical change:
         env:
-          # This is the "Magic Variable" the CLI looks for if the input fails
           GEMINI_MODEL: "gemini-1.5-flash"
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Keep this here, but the env variable above is the fallback
-          model: "gemini-1.5-flash"
+          model: "gemini-1.5-flash" # Keep this as a backup
           gemini_debug: true
           prompt: |
+            Triage this KOReader Calibre Plugin issue.
             Triage this KOReader Calibre Plugin issue.
             Event: ${{ github.event_name }}
             Issue: #${{ github.event.issue.number }} - ${{ github.event.issue.title }}
