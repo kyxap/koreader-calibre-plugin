@@ -22,15 +22,11 @@ jobs:
       - name: Run Gemini Triage
         uses: google-github-actions/run-gemini-cli@v0
         env:
-          # FORCE THE MODEL HERE
           GEMINI_MODEL: "gemini-1.5-flash"
-          # FORCE DEBUG SO WE CAN SEE THE API CALLS
-          GEMINI_DEBUG: "true"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Keep this for good measure
-          model: "gemini-1.5-flash"
+          gemini_debug: true
           prompt: |
             Triage this KOReader Calibre Plugin issue.
             Triage this KOReader Calibre Plugin issue.
