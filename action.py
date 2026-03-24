@@ -288,8 +288,8 @@ class KoreaderAction(InterfaceAction):
                     print(f"Failed to load extension: {e}")
 
     def is_usb_device(self, device):
-        """Returns True if the device is connected via USB Mass Storage."""
-        return isinstance(device, USBMS)
+        """Returns True if the device is connected via USB Mass Storage or Folder Device."""
+        return isinstance(device, USBMS) or device.__class__.__name__ == 'FOLDER_DEVICE'
 
     def exec_main_action(self) -> None:
         # Execute main action defined by user
@@ -796,7 +796,8 @@ class KoreaderAction(InterfaceAction):
         sidecar_lua_formatted = f"-- we can read Lua syntax here!\nreturn {sidecar_lua}\n"
 
         # Create parent directory for USB devices (Issue #68 / #73)
-        if self.is_usb_device(device):
+        is_usb = self.is_usb_device(device)
+        if is_usb:
             try:
                 parent_dir = os.path.dirname(path)
                 if not os.path.exists(parent_dir):
@@ -806,6 +807,20 @@ class KoreaderAction(InterfaceAction):
                 debug_print(f"Failed to create directory {parent_dir}: {os_e}")
                 return "failure", {
                     'result': f'Unable to create directory at: {path} due to {os_e}',
+                }
+
+            # Use direct file writing for USB/Folder devices to avoid driver-specific put_file issues (#143)
+            try:
+                with open(path, "wb") as f:
+                    debug_print(f"Writing directly to {path}")
+                    f.write(sidecar_lua_formatted.encode('utf-8'))
+                return "success", {
+                    'result': 'success',
+                }
+            except Exception as e:
+                debug_print(f"Failed to write directly to {path}: {e}")
+                return "failure", {
+                    'result': f'Failed to write directly to device: {e}',
                 }
 
         # Use device.put_file to support wireless devices (#122)
