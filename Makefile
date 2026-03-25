@@ -111,6 +111,14 @@ bump-major:
 	@awk -F. '{print $$1+1".0.0"}' .version > .version.tmp && mv .version.tmp .version
 	@echo "Version bumped to $$(cat .version)"
 
+pre:
+	@if grep "-pre" .version > /dev/null 2>&1; then \
+		echo "Version already has -pre suffix"; \
+	else \
+		sed -i 's/$$/-pre/' .version; \
+		echo "Version updated to $$(cat .version)"; \
+	fi
+
 zip: $(dist_dir)
 	@echo "Creating new $(dist_dir)/$(zip_file)"
 	@mkdir -p "$(dist_dir)" && zip -r "$(dist_dir)/$(zip_file)" $(zip_contents)

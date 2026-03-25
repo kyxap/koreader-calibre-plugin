@@ -21,11 +21,8 @@ jobs:
       - name: Build Plugin
         id: build
         run: |
-          # Read current version and append -pre
           VERSION=$(head -n 1 .version)
-          PRE_VERSION="${VERSION}-pre"
-          echo "${PRE_VERSION}" > .version
-          echo "version=${PRE_VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
           make build
 
       - name: Create or Update Dev Release
