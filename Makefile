@@ -111,10 +111,13 @@ bump-major:
 	@awk -F. '{print $$1+1".0.0"}' .version > .version.tmp && mv .version.tmp .version
 	@echo "Version bumped to $$(cat .version)"
 
-pre: clean_dev pre_version zip
+pre: pre_version
+	@$(MAKE) zip
 
 pre_version:
 	@$(eval PRE_RELEASE_VERSION=$(shell echo $(version) | sed 's/-pre//')-pre)
+	@mkdir -p "$(dist_dir)"
+	@echo "$(PRE_RELEASE_VERSION)" > "$(dist_dir)/.version-dev"
 	@sed -i 's/^[[:space:]]*version = .*/    version = $(version_tuple)/' $(init_file_to_upd)
 	@sed -i "s/^[[:space:]]*version_string = .*/    version_string = \"$(PRE_RELEASE_VERSION)\"/" $(init_file_to_upd)
 	@sed -i 's/Version: [^;]*;/Version: $(PRE_RELEASE_VERSION);/' $(plugin_index_file_to_upd)
