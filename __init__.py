@@ -35,8 +35,8 @@ class KoreaderSync(InterfaceActionBase):
     name = 'KOReader Sync'
     description = 'Get metadata from a connected KOReader device'
     author = 'harmtemolder & others, currently maintaining by: kyxap'
-    version = (0, 8, 1)
-    version_string = '0.8.1'
+    version = (0, 8, 2)
+    version_string = "0.8.2-pre"
     minimum_calibre_version = (5, 0, 1)  # Because Python 3
     config = JSONConfig(os.path.join('plugins', 'KOReader Sync.json'))
     actual_plugin = 'calibre_plugins.koreader.action:KoreaderAction'
