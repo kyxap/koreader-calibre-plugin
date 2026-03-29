@@ -225,11 +225,10 @@ make dev FLATPAK=1
 | Target         | Description                                                                                                      |
 |----------------|------------------------------------------------------------------------------------------------------------------|
 | `test`         | Run unit and integration tests using `pytest` (includes Calibre environment mocks)                               |
-| `lint`         | Run static analysis using `pylint` (enforces 9.5/10 score and zero Errors)                      |
-| `dev`          | Load plugin source directly into Calibre and launch in debug mode                               |
-| `pre`          | Patch internal version with `-pre` and build a community pre-release ZIP                        |
-| `bump-patch`   | Increment the patch version in `.version` (e.g., 0.8.0 -> 0.8.1)                                |
-
+| `lint`         | Run static analysis using `pylint` (enforces 9.5/10 score and zero Errors)                                       |
+| `dev`          | Load plugin source directly into Calibre and launch in debug mode                                                |
+| `pre`          | Patch internal version with `-pre` and build a community pre-release ZIP                                         |
+| `bump-patch`   | Increment the patch version in `.version` (e.g., 0.8.0 -> 0.8.1)                                                 |
 | `bump-minor`   | Increment the minor version in `.version` (e.g., 0.8.0 -> 0.9.0)                                                 |
 | `bump-major`   | Increment the major version in `.version` (e.g., 0.8.0 -> 1.0.0)                                                 |
 | `prep-release` | Create a `release-prep-<version>` branch, update files, and commit                                               |
