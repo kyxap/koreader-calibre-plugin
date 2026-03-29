@@ -185,4 +185,3 @@ md_to_bb:
 	@cat .scripts/output.forumbb
 
 .PHONY: build release zip dev install load update_version update_version_plugin_index update_version_init debug_version tag md_to_bb dev_version clean_dev clean prep-release test lint bump-patch bump-minor bump-major
-
