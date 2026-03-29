@@ -10,7 +10,7 @@ permissions:
   issues: write
 
 jobs:
-  dev-release:
+  pre-release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -25,22 +25,22 @@ jobs:
           echo "version=${VERSION}-pre" >> $GITHUB_OUTPUT
           make pre
 
-      - name: Create or Update Dev Release
+      - name: Create or Update Pre Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: dev-build
+          tag_name: pre-release
           name: "Upcoming Release (v${{ steps.build.outputs.version }})"
           body: |
             This is a **community pre-release** containing the latest fixes and features planned for the next official update.
-            
+
             We invite everyone to collaborate:
             - 🧪 **Test**: Download and try this build.
             - 💬 **Feedback**: Let us know if the fixes work for you!
             - 🚀 **Contribute**: Help us ensure the best possible stable release.
-            
+
             **Note:** This build is experimental and updated automatically on every change to the `develop` branch.
-            
+
             Last updated: ${{ github.event.head_commit.timestamp }}
             Commit: ${{ github.sha }}
           prerelease: true
@@ -55,14 +55,14 @@ jobs:
           # Extract issue numbers from commit message (e.g., #123)
           COMMIT_MSG=$(git log -1 --pretty=%B)
           ISSUE_NUMBERS=$(echo "$COMMIT_MSG" | grep -oP '#\K\d+' | sort -u)
-          
+
           if [ -n "$ISSUE_NUMBERS" ]; then
             for ISSUE in $ISSUE_NUMBERS; do
               echo "Notifying issue #$ISSUE"
-              gh issue comment "$ISSUE" --body "A potential fix has been pushed to the **develop** branch. 
-              
-              You can download the latest pre-release build for testing here: [Dev Build (Rolling)](https://github.com/${{ github.repository }}/releases/tag/dev-build)
-              
+              gh issue comment "$ISSUE" --body "A potential fix has been pushed to the **develop** branch.
+
+              You can download the latest pre-release for testing here: [Pre-release (Rolling)](https://github.com/${{ github.repository }}/releases/tag/pre-release)
+
               *(Note: This is an automated notification)*"
             done
           else
