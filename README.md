@@ -1,9 +1,9 @@
 # KOReader calibre plugin
 
-[![Build & Test (main)](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/ci.yml)
+[![Main CI](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/ci.yml)
 [![Latest Stable Release](https://img.shields.io/github/v/release/kyxap/koreader-calibre-plugin?label=latest%20stable&color=green)](https://github.com/kyxap/koreader-calibre-plugin/releases)
 
-[![Pre-release Build (develop)](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/dev-release.yml/badge.svg?branch=develop)](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/dev-release.yml)
+[![Develop CI](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/dev-release.yml/badge.svg?branch=develop)](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/dev-release.yml)
 [![Upcoming Release](https://img.shields.io/github/v/tag/kyxap/koreader-calibre-plugin/dev-build?label=upcoming%20release&color=orange)](https://github.com/kyxap/koreader-calibre-plugin/releases/tag/dev-build)
 
 [![License](https://img.shields.io/github/license/kyxap/koreader-calibre-plugin?color=blue)](https://github.com/kyxap/koreader-calibre-plugin/blob/main/LICENSE)

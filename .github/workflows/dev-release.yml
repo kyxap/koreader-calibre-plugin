@@ -1,4 +1,4 @@
-name: Pre-release Build
+name: Develop CI
 
 on:
   push:
