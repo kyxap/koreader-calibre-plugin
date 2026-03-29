@@ -1,5 +1,10 @@
 # KOReader calibre plugin
 
+![CI](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/ci.yml/badge.svg?branch=main)
+![Dev Build](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/dev-release.yml/badge.svg?branch=develop)
+![Latest Release](https://img.shields.io/github/v/release/kyxap/koreader-calibre-plugin?include_prereleases&label=latest%20release&color=green)
+![License](https://img.shields.io/github/license/kyxap/koreader-calibre-plugin?color=blue)
+
 A calibre plugin to synchronize metadata from KOReader to calibre.
 
 [KOReader](https://koreader.rocks/) creates sidecar files that hold read
