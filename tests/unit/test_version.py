@@ -8,14 +8,22 @@ def test_version_match():
 
     # Enforce no '-pre' on main branch releases
     # GITHUB_REF_NAME is provided by GitHub Actions
-    if os.environ.get('GITHUB_REF_NAME') == 'main':
+    is_main = os.environ.get('GITHUB_REF_NAME') == 'main'
+    
+    if is_main:
         assert "-pre" not in version, "Release error: .version file on 'main' branch must not contain '-pre'!"
 
     with open("__init__.py", "r") as f:
         content = f.read()
-        # Support both single and double quotes for the version string
-        pattern = rf'version_string\s*=\s*[\'"]{re.escape(version)}[\'"]'
-        assert re.search(pattern, content), f"Version string '{version}' not found in __init__.py"
+        
+        # On main, we expect an exact match.
+        # On other branches, we allow -pre or -dev suffixes (added by 'make pre' or 'make dev')
+        if is_main:
+            pattern = rf'version_string\s*=\s*[\'"]{re.escape(version)}[\'"]'
+        else:
+            pattern = rf'version_string\s*=\s*[\'"]{re.escape(version)}(-pre|-dev)?[\'"]'
+            
+        assert re.search(pattern, content), f"Version string matching '{version}' not found in __init__.py"
 
 def test_version_tuple_match():
     """Check if version in .version matches version tuple in __init__.py"""
