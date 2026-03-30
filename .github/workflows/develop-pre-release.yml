@@ -36,6 +36,17 @@ jobs:
           # 3. Create the ZIP (bypassing the 'build' target which would reset these changes)
           make zip
 
+      - name: Cleanup Old Assets
+        run: |
+          # Get list of all assets for the 'pre-release' tag and delete them
+          ASSETS=$(gh release view pre-release --json assets --query "assets[].name" -t "{{range .}}{{.}} {{end}}")
+          for ASSET in $ASSETS; do
+            echo "Deleting old asset: $ASSET"
+            gh release delete-asset pre-release "$ASSET" --yes
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create or Update Pre Release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -58,6 +69,7 @@ jobs:
           files: dist/*.zip
           make_latest: false
           generate_release_notes: false
+          append_body: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
