@@ -39,10 +39,12 @@ jobs:
       - name: Cleanup Old Assets
         run: |
           # Get list of all assets for the 'pre-release' tag and delete them
-          ASSETS=$(gh release view pre-release --json assets --query "assets[].name" -t "{{range .}}{{.}} {{end}}")
+          ASSETS=$(gh release view pre-release --json assets --jq '.assets[].name' || echo "")
           for ASSET in $ASSETS; do
-            echo "Deleting old asset: $ASSET"
-            gh release delete-asset pre-release "$ASSET" --yes
+            if [ -n "$ASSET" ]; then
+              echo "Deleting old asset: $ASSET"
+              gh release delete-asset pre-release "$ASSET" --yes
+            fi
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
