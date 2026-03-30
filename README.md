@@ -5,7 +5,7 @@
 [![Latest Stable Release](https://img.shields.io/github/v/release/kyxap/koreader-calibre-plugin?label=latest%20stable&color=green)](https://github.com/kyxap/koreader-calibre-plugin/releases)
 
 [![Pre-release CI](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/develop-pre-release.yml/badge.svg)](https://github.com/kyxap/koreader-calibre-plugin/actions/workflows/develop-pre-release.yml)
-[![Upcoming Release](https://img.shields.io/github/v/tag/kyxap/koreader-calibre-plugin/pre-release?label=upcoming%20release&color=orange)](https://github.com/kyxap/koreader-calibre-plugin/releases/tag/pre-release)
+[![Upcoming Release](https://img.shields.io/github/v/release/kyxap/koreader-calibre-plugin?include_prereleases&label=upcoming%20release&color=orange&filter=*pre*)](https://github.com/kyxap/koreader-calibre-plugin/releases/tag/pre-release)
 
 [![License](https://img.shields.io/github/license/kyxap/koreader-calibre-plugin?color=blue)](https://github.com/kyxap/koreader-calibre-plugin/blob/main/LICENSE)
 
