@@ -63,6 +63,11 @@ from calibre.devices.usbms.driver import debug_print as root_debug_print, USBMS
 from calibre.constants import numeric_version
 from enum import Enum, auto
 
+from calibre.constants import numeric_version, preferred_encoding
+from calibre.db.cache import Cache
+from calibre.utils.icu import lower as icu_lower
+from calibre import isbytestring
+
 __license__ = 'GNU GPLv3'
 __copyright__ = '2021, harmtemolder <mail at harmtemolder.com>'
 __modified_by__ = 'kyxap kyxappp@gmail.com'
@@ -102,6 +107,9 @@ class OperationStatus(Enum):
     FAIL = auto()
     SKIP = auto()
 
+
+def title_lookup(db: Cache):
+    return {icu_lower(value): id for id, value in db.fields['title'].table.book_col_map.items()}
 
 def is_system_path(path):
     """
@@ -422,7 +430,7 @@ class KoreaderAction(InterfaceAction):
             sidecar_path = re.sub(
                 r'\.([^./\\]+)$', r'.sdr/metadata.\1.lua', book.path
             )
-            paths.append((book.uuid, sidecar_path))
+            paths.append((book.uuid, sidecar_path, book))
 
 
         debug_print(
@@ -884,7 +892,7 @@ class KoreaderAction(InterfaceAction):
         num_fail = 0
         num_skipped_existing = 0
 
-        for book_uuid, path in sidecar_paths:
+        for book_uuid, path, book in sidecar_paths:
             # Check if exists first (issue #122 revisited)
             if self.device_path_exists(device, path):
                 debug_print(f"Skipping existing sidecar: {path}")
@@ -1236,12 +1244,23 @@ class KoreaderAction(InterfaceAction):
                 num_fail = 0
                 num_skip = 0
 
-                for idx, (book_uuid, sidecar_path) in enumerate(self.sidecar_paths):
+                titles = title_lookup(db)
+
+                for idx, (book_uuid, sidecar_path, book) in enumerate(self.sidecar_paths):
                     debug_print('Trying to get sidecar from ', device,
                                 ', with sidecar_path: ', sidecar_path)
 
+                    # Leo start: search a book by title as well
+                    book_matched_by_title = False
+                    search = book.title
+                    if isbytestring(search):
+                        search = search.decode(preferred_encoding, 'replace')
+                    search = icu_lower(search)
+                    book_by_title = titles.get(search)
+                    # Leo end
+
                     # pre-checks before parsing
-                    if book_uuid is None:
+                    if book_uuid is None and book_by_title is None:
                         status = 'skipped, no UUID'
                         append_results(results, None, status,
                                        book_uuid, sidecar_path)
@@ -1263,13 +1282,35 @@ class KoreaderAction(InterfaceAction):
                                 if book_id:
                                     book_uuid = better_uuid # Use the one that worked
 
+                        # Leo start: try to match by title if uuid was not found
+                        book_by_title_id = book_by_title
+                        if book_id is not None:
+                            if book_by_title_id != book_id:
+                                status = f"book id {book_by_title} does not match uuid id {book_id_by_uuid}"
+                                append_results(results, search, status,
+                                            book_uuid, sidecar_path)
+                                num_skip += 1
+                                continue
+                        else:
+                            book_matched_by_title = True
+                            book_id = book_by_title_id
+                        # Leo end
+
                         if not book_id:
                             raise Exception("Book not found")
                         metadata = db.get_metadata(book_id)
+
+                        # Leos start: if matched by title, get uuid from metadata
+                        if book_uuid is None:
+                            book_uuid = metadata.get('uuid')
+                        # Leo end
+
                         title = metadata.get('title')
                     except Exception as e:
                         debug_print(f"Failed to lookup book {book_uuid}: {e}")
                         status = 'skipped, could not find in library'
+                        if book_matched_by_title:
+                            status += ' [matched by title]'
                         append_results(results, "Unknown", status,
                                        book_uuid, sidecar_path)
                         num_skip += 1
@@ -1282,6 +1323,8 @@ class KoreaderAction(InterfaceAction):
                     if sidecar_contents is GetSidecarStatus.PATH_NOT_FOUND:
                         status = ('skipped, sidecar does not exist '
                                   '(seems like book is never opened)')
+                        if book_matched_by_title:
+                            status += ' [matched by title]'
                         append_results(results, title, status,
                                        book_uuid, sidecar_path)
                         num_skip += 1
@@ -1289,6 +1332,8 @@ class KoreaderAction(InterfaceAction):
 
                     if sidecar_contents is GetSidecarStatus.DECODE_FAILED:
                         status = 'decoding is failed see debug for more details'
+                        if book_matched_by_title:
+                            status += ' [matched by title]'
                         append_results(results, title, status,
                                        book_uuid, sidecar_path)
                         num_fail += 1
