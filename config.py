@@ -201,6 +201,7 @@ CUSTOM_COLUMN_DEFAULTS = {
         'first_in_group': True,
         'column_heading': _("KOReader MD5"),
         'datatype': 'text',
+        'use_composite': True,
         'description': _("MD5 hash used by KOReader, allowed for ProgressSync Support."),
         'default_lookup_name': '#ko_md5',
         'config_label': _('MD5 hash column:'),
@@ -371,7 +372,8 @@ class ConfigWidget(QWidget):  # https://doc.qt.io/qt-5/qwidget.html
 
         for config_name, metadata in CUSTOM_COLUMN_DEFAULTS.items():
             self.sync_custom_columns[config_name] = {'current_columns': self.get_custom_columns(
-                metadata['datatype'], metadata.get('is_multiple', (False, False))[1])}
+                metadata['datatype'], metadata.get('is_multiple', (False, False))[1], metadata.get('use_composite', False)
+                )}
             self._column_combo = self.create_custom_column_controls(
                 columns_group_box_layout2, config_name)
             metadata['comboBox'] = self._column_combo
@@ -558,7 +560,7 @@ class ConfigWidget(QWidget):  # https://doc.qt.io/qt-5/qwidget.html
                 self.action.gui)
         return self._get_create_new_custom_column_instance
 
-    def get_custom_columns(self, datatype, only_is_multiple=False):
+    def get_custom_columns(self, datatype, only_is_multiple=False, use_composite=False):
         if SUPPORTS_CREATE_CUSTOM_COLUMN:
             custom_columns = self.get_create_new_custom_column_instance.current_columns()
         else:
@@ -566,7 +568,7 @@ class ConfigWidget(QWidget):  # https://doc.qt.io/qt-5/qwidget.html
         available_columns = {}
         for key, column in custom_columns.items():
             typ = column['datatype']
-            if typ == datatype:
+            if typ == datatype or ( use_composite and typ=='composite'):
                 available_columns[key] = column
         if datatype == 'rating':  # Add rating column if requested
             ratings_column_name = self.action.gui.library_view.model(
