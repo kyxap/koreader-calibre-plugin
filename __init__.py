@@ -70,6 +70,10 @@ def clean_bookmarks(bookmarks):
     highlights_by_chapter = {}
 
     for annotation in bookmarks.values():
+        if not isinstance(annotation, dict):
+            debug_print('skipping non-annotation value', annotation)
+            continue
+
         if 'note' not in annotation:
             debug_print('annotation does not have `note`', annotation)
         else:

@@ -39,3 +39,21 @@ def test_clean_bookmarks_large_payload():
 
 def test_clean_bookmarks_empty():
     assert 'Book Highlights and Notes' in clean_bookmarks({})
+
+def test_clean_bookmarks_skips_non_annotation_values():
+    bookmarks = {
+        1: {
+            'chapter': 'Chapter 1',
+            'note': 'A note',
+            'text': 'A highlight',
+            'datetime': '2026-09-28 12:00:00',
+        },
+        'unchanged': True,
+    }
+
+    result = clean_bookmarks(bookmarks)
+
+    assert 'A note' in result
+    assert 'A highlight' in result
+    assert '1. Highlight' in result
+    assert 'True' not in result
