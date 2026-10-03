@@ -57,7 +57,8 @@ that thread.
 
    These are your options:
    - A _Floating point numbers_ column to store the **current percent read**,
-     with _Format for numbers_ set to `{:.0%}`.
+     with _Format for numbers_ set to `{:.0%}`. Auto-created columns use
+     `{:.2%}`, which shows two decimal places.
    - An _Integers_ column to store the **current percent read**.
    - A regular _Text_ column to store the **location you last stopped reading at**
    - A _Rating_ column to store your **rating** of the book, as entered on the
@@ -70,9 +71,9 @@ that thread.
    - A _Yes/No_ column to store the **reading status** of the book, as a
      boolean (_Yes_ = _Finished_, _No_ = everything else).
    - A _Long text_ column to store your **bookmarks and highlights** of the
-     book, with _Interpret this column as_ set to _Plain text formatted using
-     markdown_. (Highlights are an unordered list with their metadata in an
-     HTML comment.)
+     book, with _Interpret this column as_ set to _HTML_ (calibre's default).
+     (Highlights are grouped by chapter and numbered, with their metadata in an
+     HTML comment. _Plain text formatted using Markdown_ also displays them.)
    - A regular _Text_ column to store the **MD5 hash** KOReader uses to sync
      progress to a [KOReader Sync
      Server](https://github.com/koreader/koreader-sync-server#koreader-sync-server)
@@ -84,10 +85,17 @@ that thread.
    - A _Date_ column to store **when the book status was first marked reading**.
    - A _Date_ column to store **when the book status was first marked finished**.
    - A _Long text_ column to store the **contents of the metadata sidecar** as
-     HTML, with _Interpret this column as_ set to _HTML_.
+     JSON, with _Interpret this column as_ set to _Plain text_. When the plugin
+     creates this column, calibre's dialog preselects _HTML_; switch it to
+     _Plain text_ before clicking _OK_ (or later under _Preferences_ > _Add
+     your own columns_).
 
    There are additional settings for:
-   - Sync only if changes are more recent: Checks retrieved **Last Sync Date** against date on file.
+   - Sync only if changes are more recent: Skips a book if the date in the
+     **Date Modified column** in calibre is the same as or newer than the
+     incoming one. If that column isn't mapped, or the sync has no modified date
+     (as with _Sync from ProgressSync_), it compares **percent read** instead and
+     skips the book if calibre's is the same or higher.
    - No sync if book has already been finished: If **percent read** is _100_ or if **reading status** is _finished_ don't update data.
    - Automatic Sync on device connection: Silently sync's from KOReader when device is connected
 
@@ -133,6 +141,11 @@ changed/removed from `sidecar_contents` data structure:
 - When pushing missing sidecars to the device, no attempt is made to convert
   Calibre's metadata to account for changes in KOReader's sidecar format. Old
   metadata may work unpredictably if it's from a different version of KOReader.
+- _Sync missing to KOReader_ can't write sidecars through calibre's wireless
+  device driver (`SMART_DEVICE_APP`, used by KOReader's wireless connection),
+  so connect over USB or use a connected folder. _Sync from ProgressSync_ is
+  not an alternative: it only updates progress-related metadata in calibre and
+  doesn't restore sidecars or highlights on the device.
 
 ### Supported devices
 
@@ -189,8 +202,11 @@ them [here](https://github.com/kyxap/koreader-calibre-plugin/issues).
   Preferences" > "Tweaks", search for `auto_connect_to_folder`. Point that to
   the `dummy_device` folder in this repository. (I have included royalty free
   EPUBs for your and my convenience.)
-- If you're testing and don't actually want to update any metadata,
-  set `DRY_RUN` to `True` in `__init__.py`.
+- If you're testing and don't actually want to update any metadata in
+  calibre, set `DRY_RUN` to `True` in `__init__.py`. This only takes effect
+  when calibre runs in debug mode (`calibre-debug -g`, which `make dev` uses),
+  and it doesn't stop _Sync missing to KOReader_ from writing sidecars to the
+  device.
 - I work in PyCharm, which offers a remote debugging server. To enable that in
   this plugin, set `PYDEVD` to `True` in `__init__.py`.You might need to
   change `sys.path.append` in `action.py`.

@@ -828,7 +828,7 @@ class KoreaderAction(InterfaceAction):
         if not hasattr(device, 'put_file'):
             debug_print(f"Device driver {device.__class__.__name__} does not support writing sidecar files wirelessly.")
             return "failure", {
-                'result': 'Wireless write not supported by this device driver. Please use USB or Sync Server.',
+                'result': 'Wireless write not supported by this device driver. Please connect via USB or use a connected folder.',
             }
 
         try:
