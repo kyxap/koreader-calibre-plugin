@@ -90,7 +90,8 @@ CUSTOM_COLUMN_DEFAULTS = {
                              'percent read, with "Format for numbers" set to 0.00%.'),
         'data_source': 'sidecar',
         'data_location': ['percent_finished'],
-        'transform': (lambda value: float(value)),
+        # Same range as ProgressSync, see checkbox_percent_read_100
+        'transform': (lambda value: float(value) * 100 if CONFIG['checkbox_percent_read_100'] else float(value)),
     },
     'column_percent_read_int': {
         'column_heading': _("KOReader Progress"),
@@ -278,7 +279,9 @@ CHECKBOXES = {  # Each entry in the below dict is keyed with config_name
     'checkbox_percent_read_100': {
         'config_label': 'Percent read column (float) range 0.0-100.0',
         'config_tool_tip': 'Default the range is 0.0-1.0\n'
-        'Checking this option the float value is multiplied by 100 to be in range 0.0-100.0',
+        'Checking this option the float value is multiplied by 100 to be in range 0.0-100.0\n'
+        'Applies to sidecar sync and ProgressSync. Set the column\'s number format to e.g. {:.2f}%;\n'
+        'the default {:.2%} would show 46.0 as 4600.00%',
     },
     'checkbox_sync_if_more_recent': {
         'config_label': 'Sync only if changes are more recent',

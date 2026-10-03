@@ -115,6 +115,34 @@ def is_system_path(path):
     return any(substring in path for substring in to_ignore)
 
 
+def normalize_read_percent(column, value):
+    """
+    Put a percent read value on a 0-100 scale so it can be compared no matter
+    which column it comes from or which range the float column uses
+
+    The int column is always 0-100. The float column is 0-1, or 0-100 with
+    checkbox_percent_read_100. A float above 1 can only be on the 0-100 scale
+    (stored while that option was on), so it is not multiplied again.
+
+    With the option on, a float of 1 or less may also be a 0-1 value stored by
+    an older sidecar sync. It is taken as 0-100: that can only make a book look
+    less read, so at worst the first sync after upgrading accepts lower
+    progress or overwrites a finished book once; after that the value is 0-100.
+    The reverse case can't be told apart: with the option off, a 0-100 value
+    of 1 or less stored while it was on (e.g. 1.0 for 1%) reads as up to 100%,
+    so "No sync if finished" may skip that book until the value is edited.
+
+    :param column: lookup name of the column the value belongs to
+    :param value: percent read as stored in, or to be written to, that column
+    :return: value on a 0-100 scale, or None
+    """
+    if value is None:
+        return None
+    if column == CONFIG['column_percent_read'] and not CONFIG['checkbox_percent_read_100'] and value <= 1:
+        return value * 100
+    return value
+
+
 def append_results(results, title, status_msg, book_uuid, sidecar_path):
     debug_print = partial(
         module_debug_print,
@@ -550,8 +578,8 @@ class KoreaderAction(InterfaceAction):
                     }
             # Fallback if no 'Date Modified Column' is set or not obtainable (wireless)
             elif new_date_modified is None:
-                current_read_percent = metadata.get(read_percent_key)
-                new_read_percent = keys_values_to_update.get(read_percent_key)
+                current_read_percent = normalize_read_percent(read_percent_key, metadata.get(read_percent_key))
+                new_read_percent = normalize_read_percent(read_percent_key, keys_values_to_update.get(read_percent_key))
                 if current_read_percent is not None and new_read_percent is not None:
                     if current_read_percent >= new_read_percent:
                         debug_print(
@@ -570,7 +598,7 @@ class KoreaderAction(InterfaceAction):
         # Check config to sync only if the book is not yet finished
         status_key = CONFIG['column_status']
         if CONFIG['checkbox_no_sync_if_finished']:
-            current_read_percent = metadata.get(read_percent_key)
+            current_read_percent = normalize_read_percent(read_percent_key, metadata.get(read_percent_key))
             current_status = metadata.get(status_key)
             if current_read_percent is not None and current_read_percent >= 100 \
                     or current_status is not None and current_status == "complete":
@@ -583,7 +611,7 @@ class KoreaderAction(InterfaceAction):
         if status_key:
             new_status = keys_values_to_update.get(status_key)
             if not new_status:
-                new_read_percent = keys_values_to_update.get(read_percent_key)
+                new_read_percent = normalize_read_percent(read_percent_key, keys_values_to_update.get(read_percent_key))
                 current_status = metadata.get(status_key)
                 if new_read_percent and current_status != "abandoned":
                     if new_read_percent > 0 and new_read_percent < 100 and current_status != "reading":
@@ -992,7 +1020,7 @@ class KoreaderAction(InterfaceAction):
             return None
 
         status_key = CONFIG['column_status']
-        read_percent_key = CONFIG['column_percent_read_int'] or CONFIG['column_percent_read']
+        read_percent_key = CONFIG['column_percent_read'] or CONFIG['column_percent_read_int']
         if read_percent_key == '' or status_key == '':
             error_dialog(
                 self.gui,
@@ -1036,7 +1064,9 @@ class KoreaderAction(InterfaceAction):
 
             # Only get sync status if curr progress < 100 and status = reading or if curr_progress/status is not set yet
             metadata_status = metadata.get(status_key)
-            metadata_read_percent = metadata.get(read_percent_key)
+            metadata_read_percent = normalize_read_percent(read_percent_key, metadata.get(read_percent_key))
+            if metadata_read_percent is None:
+                metadata_read_percent = metadata.get(CONFIG['column_percent_read_int'])
             if (metadata_status is None or metadata_status == "reading") and (metadata_read_percent is None or metadata_read_percent < 100):
                 try:
                     url = f'{CONFIG["progress_sync_url"]}/syncs/progress/{md5_value}'
