@@ -280,7 +280,7 @@ class KoreaderAction(InterfaceAction):
                         "KOSync_extension", filepath)
                     extension = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(extension)
-                    if hasattr(extension, "onItemUpdate"):
+                    if callable(getattr(extension, "onItemUpdate", None)):
                         self.extension_callback = extension.onItemUpdate
                         print(f"Loaded onItemUpdate from {filename}")
                         return
@@ -601,10 +601,10 @@ class KoreaderAction(InterfaceAction):
                         if status_bool_key:
                             keys_values_to_update[status_bool_key] = True
 
-        # Call the extension callback if it exists
+        # Call the extension callback if it exists (see README, "Extensions")
         if self.extension_callback:
             try:
-                updateLog = self.extension_callback(
+                extension_result = self.extension_callback(
                     self=self,
                     metadata=metadata,
                     keys_values_to_update=keys_values_to_update,
@@ -612,6 +612,15 @@ class KoreaderAction(InterfaceAction):
                     CONFIG=CONFIG,
                     book_id=book_id
                 )
+                # None keeps the current updateLog (the callback may have
+                # changed it in place); anything else must be a dict
+                if isinstance(extension_result, dict):
+                    updateLog = extension_result
+                elif extension_result is not None:
+                    debug_print(
+                        'extension onItemUpdate returned '
+                        f'{type(extension_result).__name__}, expected dict '
+                        'or None; keeping the existing updateLog')
             except Exception as e:
                 debug_print(f'Error in extension onItemUpdate: {e}')
 

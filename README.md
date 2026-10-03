@@ -134,6 +134,50 @@ changed/removed from `sidecar_contents` data structure:
   Calibre's metadata to account for changes in KOReader's sidecar format. Old
   metadata may work unpredictably if it's from a different version of KOReader.
 
+### Extensions
+
+You can change what gets synced with a small Python file named
+`KOSync_extension*.py` (e.g. `KOSync_extension_mine.py`), placed in the folder
+that holds the plugin ZIP. That's normally the `plugins` folder inside calibre's
+configuration folder (_Preferences_ > _Advanced_ > _Miscellaneous_ > _Open
+calibre configuration folder_).
+
+- It's loaded when calibre starts, so restart calibre after changing it.
+  `calibre-debug -g` prints `Loaded onItemUpdate from ...` when it loads.
+- Each matching file is run as it's checked, until one has a callable
+  `onItemUpdate`; only that one is used. Files are checked in no particular
+  order, so keep just one.
+- `onItemUpdate` is called for each book being updated, just before the new
+  values are written; skipped books don't reach it. During a device sync it
+  runs in a background thread, so don't open dialogs or touch calibre's window
+  from it.
+- Arguments are passed by keyword, so keep these names. Add `**kwargs` so your
+  extension keeps working if more are added:
+
+  ```python
+  def onItemUpdate(self, metadata, keys_values_to_update, updateLog, CONFIG,
+                   book_id, **kwargs):
+      # self: the plugin's KoreaderAction
+      # metadata: the book's calibre metadata (read-only)
+      # keys_values_to_update: dict of column lookup name -> new value
+      # updateLog: dict of column name -> text for the sync results
+      # CONFIG: the plugin's live settings (read-only)
+      # book_id: the book's calibre id
+      return updateLog
+  ```
+
+- To change what's written, edit, add or remove entries in
+  `keys_values_to_update`. Values must suit the column's type, or the sync
+  stops. Treat `metadata` and `CONFIG` as read-only; assigning to `CONFIG`
+  rewrites the plugin's settings file.
+- Return the `updateLog` dict (string keys only), or `None` to keep it, e.g. if
+  you changed it in place. Other return values are ignored. Errors raised by
+  `onItemUpdate` are logged in debug mode and the sync carries on.
+
+**Note:** `CONFIG` includes your ProgressSync username and password hash, and
+the hash is what the plugin uses to log in to your sync server. Extensions run
+inside calibre with full access, so only install extensions you trust.
+
 ### Supported devices
 
 This plugin has been tested successfully with:
