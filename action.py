@@ -11,6 +11,7 @@ import re
 import sys
 import importlib.util
 import time
+import traceback
 
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
@@ -115,7 +116,7 @@ def is_system_path(path):
     return any(substring in path for substring in to_ignore)
 
 
-def append_results(results, title, status_msg, book_uuid, sidecar_path):
+def append_results(results, title, status_msg, book_uuid, sidecar_path, error=None):
     debug_print = partial(
         module_debug_print,
         'KoreaderAction:append_results:'
@@ -127,6 +128,7 @@ def append_results(results, title, status_msg, book_uuid, sidecar_path):
             'result': status_msg,
             'book_uuid': book_uuid,
             'sidecar_path': sidecar_path,
+            **({'error': error} if error else {}),
         }
     )
 
@@ -135,7 +137,7 @@ def parse_sidecar_lua(sidecar_lua):
     """Parses a sidecar Lua file into a Python dict
 
     :param sidecar_lua: the contents of a sidecar Lua as a str
-    :return: a dict of those contents
+    :return: a dict of those contents, or None if they could not be parsed
     """
     debug_print = partial(
         module_debug_print,
@@ -145,9 +147,14 @@ def parse_sidecar_lua(sidecar_lua):
     try:
         clean_lua = re.sub(r'^[^{]*', '', sidecar_lua).strip()
         decoded_lua = lua.decode(clean_lua)
-    except:
-        debug_print('could not decode sidecar_lua')
-        decoded_lua = None
+    except Exception as e:
+        debug_print('could not decode sidecar_lua: ', e)
+        return None
+
+    # An empty or truncated sidecar does not decode to a table (#167)
+    if not isinstance(decoded_lua, dict):
+        debug_print('sidecar_lua is not a Lua table: ', decoded_lua)
+        return None
 
     if 'bookmarks' in decoded_lua:
         if isinstance(decoded_lua['bookmarks'], list):
@@ -438,7 +445,7 @@ class KoreaderAction(InterfaceAction):
 
         :param device: a device object
         :param path: a path to a sidecar Lua on the device
-        :return: dict or None
+        :return: dict, or a GetSidecarStatus if it could not be read or parsed
         """
         debug_print = partial(
             module_debug_print,
@@ -462,6 +469,9 @@ class KoreaderAction(InterfaceAction):
 
             debug_print(f'Parsing: {path}')
             parsed_contents = parse_sidecar_lua(decoded_contents)
+            if parsed_contents is None:
+                debug_print('could not parse ', path)
+                return GetSidecarStatus.DECODE_FAILED
             parsed_contents['calculated'] = {}
 
             # Ensure 'summary' exists to avoid KeyError later (#117)
@@ -1236,135 +1246,150 @@ class KoreaderAction(InterfaceAction):
                 num_fail = 0
                 num_skip = 0
 
-                for idx, (book_uuid, sidecar_path) in enumerate(self.sidecar_paths):
-                    debug_print('Trying to get sidecar from ', device,
-                                ', with sidecar_path: ', sidecar_path)
+                try:
+                    for idx, (book_uuid, sidecar_path) in enumerate(self.sidecar_paths):
+                        title = None
+                        try:
+                            debug_print('Trying to get sidecar from ', device,
+                                        ', with sidecar_path: ', sidecar_path)
 
-                    # pre-checks before parsing
-                    if book_uuid is None:
-                        status = 'skipped, no UUID'
-                        append_results(results, None, status,
-                                       book_uuid, sidecar_path)
-                        num_skip += 1
-                        continue
+                            # pre-checks before parsing
+                            if book_uuid is None:
+                                status = 'skipped, no UUID'
+                                append_results(results, None, status,
+                                               book_uuid, sidecar_path)
+                                num_skip += 1
+                                continue
 
-                    sidecar_contents = self.action.get_sidecar(
-                        device, sidecar_path)
-                    debug_print("sidecar_contents:", sidecar_contents)
+                            sidecar_contents = self.action.get_sidecar(
+                                device, sidecar_path)
+                            debug_print("sidecar_contents:", sidecar_contents)
 
-                    try:
-                        book_id = db.lookup_by_uuid(book_uuid)
-                        if not book_id:
-                            # Try to find a better UUID in the sidecar (Issue #115)
-                            better_uuid = self.action.get_calibre_uuid_from_sidecar(sidecar_contents)
-                            if better_uuid:
-                                debug_print(f"Found alternative UUID in sidecar: {better_uuid}")
-                                book_id = db.lookup_by_uuid(better_uuid)
-                                if book_id:
-                                    book_uuid = better_uuid # Use the one that worked
+                            try:
+                                book_id = db.lookup_by_uuid(book_uuid)
+                                if not book_id:
+                                    # Try to find a better UUID in the sidecar (Issue #115)
+                                    better_uuid = self.action.get_calibre_uuid_from_sidecar(sidecar_contents)
+                                    if better_uuid:
+                                        debug_print(f"Found alternative UUID in sidecar: {better_uuid}")
+                                        book_id = db.lookup_by_uuid(better_uuid)
+                                        if book_id:
+                                            book_uuid = better_uuid # Use the one that worked
 
-                        if not book_id:
-                            raise Exception("Book not found")
-                        metadata = db.get_metadata(book_id)
-                        title = metadata.get('title')
-                    except Exception as e:
-                        debug_print(f"Failed to lookup book {book_uuid}: {e}")
-                        status = 'skipped, could not find in library'
-                        append_results(results, "Unknown", status,
-                                       book_uuid, sidecar_path)
-                        num_skip += 1
-                        continue
+                                if not book_id:
+                                    raise Exception("Book not found")
+                                metadata = db.get_metadata(book_id)
+                                title = metadata.get('title')
+                            except Exception as e:
+                                debug_print(f"Failed to lookup book {book_uuid}: {e}")
+                                status = 'skipped, could not find in library'
+                                append_results(results, "Unknown", status,
+                                               book_uuid, sidecar_path)
+                                num_skip += 1
+                                continue
 
-                    self.progress_update.emit(idx + 1, title)
-                    if DEBUG: # Add time delay when debugging
-                        time.sleep(.4)
+                            self.progress_update.emit(idx + 1, title)
+                            if DEBUG: # Add time delay when debugging
+                                time.sleep(.4)
 
-                    if sidecar_contents is GetSidecarStatus.PATH_NOT_FOUND:
-                        status = ('skipped, sidecar does not exist '
-                                  '(seems like book is never opened)')
-                        append_results(results, title, status,
-                                       book_uuid, sidecar_path)
-                        num_skip += 1
-                        continue
+                            if sidecar_contents is GetSidecarStatus.PATH_NOT_FOUND:
+                                status = ('skipped, sidecar does not exist '
+                                          '(seems like book is never opened)')
+                                append_results(results, title, status,
+                                               book_uuid, sidecar_path)
+                                num_skip += 1
+                                continue
 
-                    if sidecar_contents is GetSidecarStatus.DECODE_FAILED:
-                        status = 'decoding is failed see debug for more details'
-                        append_results(results, title, status,
-                                       book_uuid, sidecar_path)
-                        num_fail += 1
-                        continue
+                            if sidecar_contents is GetSidecarStatus.DECODE_FAILED:
+                                status = 'decoding is failed see debug for more details'
+                                append_results(results, title, status,
+                                               book_uuid, sidecar_path)
+                                num_fail += 1
+                                continue
 
-                    debug_print('sidecar_contents is found!')
+                            debug_print('sidecar_contents is found!')
 
-                    keys_values_to_update = {}
+                            keys_values_to_update = {}
 
-                    for config_name, column in COLUMNS.items():
-                        target = CONFIG[config_name]
+                            for config_name, column in COLUMNS.items():
+                                target = CONFIG[config_name]
 
-                        if target == '':
-                            # No column mapped, so do not sync
-                            continue
+                                if target == '':
+                                    # No column mapped, so do not sync
+                                    continue
 
-                        # Special handling for date started/finished
-                        # Safety check for 'summary' key (#117)
-                        summary = sidecar_contents.get('summary', {})
-                        if config_name == 'column_date_book_started':
-                            if metadata.get(target) is None and summary.get('status') == 'reading':
-                                sidecar_contents['calculated']['date_book_started'] = sidecar_contents['calculated'].get('date_status_changed')
-                        if config_name == 'column_date_book_finished':
-                            if metadata.get(target) is None and summary.get('status') == 'complete':
-                                sidecar_contents['calculated']['date_book_finished'] = sidecar_contents['calculated'].get('date_status_changed')
+                                # Special handling for date started/finished
+                                # Safety check for 'summary' key (#117)
+                                summary = sidecar_contents.get('summary', {})
+                                if config_name == 'column_date_book_started':
+                                    if metadata.get(target) is None and summary.get('status') == 'reading':
+                                        sidecar_contents['calculated']['date_book_started'] = sidecar_contents['calculated'].get('date_status_changed')
+                                if config_name == 'column_date_book_finished':
+                                    if metadata.get(target) is None and summary.get('status') == 'complete':
+                                        sidecar_contents['calculated']['date_book_finished'] = sidecar_contents['calculated'].get('date_status_changed')
 
-                        data_location = column['data_location']
-                        value = sidecar_contents
+                                data_location = column['data_location']
+                                value = sidecar_contents
 
-                        for subproperty in data_location:
-                            if value and subproperty in value:
-                                value = value[subproperty]
-                            else:
-                                debug_print(
-                                    f'subproperty "{subproperty}" not found in value')
-                                value = None
-                                break
+                                for subproperty in data_location:
+                                    if value and subproperty in value:
+                                        value = value[subproperty]
+                                    else:
+                                        debug_print(
+                                            f'subproperty "{subproperty}" not found in value')
+                                        value = None
+                                        break
 
-                        # Fallback for MD5 (Issue #98)
-                        if config_name == 'column_md5' and value is None:
-                            value = sidecar_contents.get('stats', {}).get('md5')
-                            if value:
-                                debug_print('Found MD5 in fallback location (stats.md5)')
+                                # Fallback for MD5 (Issue #98)
+                                if config_name == 'column_md5' and value is None:
+                                    value = sidecar_contents.get('stats', {}).get('md5')
+                                    if value:
+                                        debug_print('Found MD5 in fallback location (stats.md5)')
 
-                        if value is None:
-                            continue
+                                if value is None:
+                                    continue
 
-                        # Transform value if required
-                        if 'transform' in column:
-                            debug_print('transforming value for ', target)
-                            value = column['transform'](value)
+                                # Transform value if required
+                                if 'transform' in column:
+                                    debug_print('transforming value for ', target)
+                                    value = column['transform'](value)
 
-                        keys_values_to_update[target] = value
+                                keys_values_to_update[target] = value
 
-                    operation_status, result = self.action.update_metadata(
-                        book_uuid, db, keys_values_to_update)
+                            operation_status, result = self.action.update_metadata(
+                                book_uuid, db, keys_values_to_update)
 
 
-                    results.append(
-                        {
-                            **result,
-                            'title': title,
-                            'book_uuid': book_uuid,
-                            'sidecar_path': sidecar_path,
-                            **({'updated': json.dumps(keys_values_to_update, default=str)} if DEBUG else {})
-                        }
-                    )
+                            results.append(
+                                {
+                                    **result,
+                                    'title': title,
+                                    'book_uuid': book_uuid,
+                                    'sidecar_path': sidecar_path,
+                                    **({'updated': json.dumps(keys_values_to_update, default=str)} if DEBUG else {})
+                                }
+                            )
 
-                    if operation_status == OperationStatus.PASS:
-                        num_success += 1
-                    elif operation_status == OperationStatus.FAIL:
-                        num_fail += 1
-                    elif operation_status == OperationStatus.SKIP:
-                        num_skip += 1
-                self.finished_signal.emit(
-                    {'results': results, 'num_success': num_success, 'num_fail': num_fail, 'num_skip': num_skip})
+                            if operation_status == OperationStatus.PASS:
+                                num_success += 1
+                            elif operation_status == OperationStatus.FAIL:
+                                num_fail += 1
+                            elif operation_status == OperationStatus.SKIP:
+                                num_skip += 1
+                        except Exception as e:
+                            # Report the book as failed and carry on with the next one (#167)
+                            debug_print(f'failed to sync {sidecar_path}:\n',
+                                        traceback.format_exc())
+                            error = f'{type(e).__name__}: {e}'
+                            append_results(results, title or 'Unknown',
+                                           'failed, unexpected error',
+                                           book_uuid, sidecar_path, error)
+                            num_fail += 1
+                finally:
+                    # Always report back, so the results dialog is shown and the
+                    # progress dialog is closed (#167)
+                    self.finished_signal.emit(
+                        {'results': results, 'num_success': num_success, 'num_fail': num_fail, 'num_skip': num_skip})
 
         db = self.gui.current_db.new_api
         startTime = time.perf_counter()
