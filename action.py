@@ -475,9 +475,13 @@ class KoreaderAction(InterfaceAction):
                 ('date_synced', lambda: datetime.now().replace(tzinfo=local_tz)),
                 ('date_status_changed', lambda: datetime.strptime(
                     parsed_contents['summary'].get('modified', datetime.now().strftime("%Y-%m-%d")), "%Y-%m-%d").replace(tzinfo=local_tz)),
-                ('date_sidecar_modified', lambda: datetime.fromtimestamp(
-                    os.path.getmtime(path) if is_usb and os.path.exists(path) else time.time()).replace(tzinfo=local_tz))
             ]
+            # The sidecar's modification time can only be read on a local
+            # (USB) device. Leave it unset otherwise, so "Sync only if changes
+            # are more recent" falls back to comparing percent read (#168)
+            if is_usb:
+                metadata_tasks.append(('date_sidecar_modified', lambda: datetime.fromtimestamp(
+                    os.path.getmtime(path)).replace(tzinfo=local_tz)))
 
             for key, task in metadata_tasks:
                 try:
